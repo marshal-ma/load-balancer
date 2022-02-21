@@ -59,7 +59,7 @@ function getProviderServer(){
 /* GET provider info. */
 router.get('/get', function(req, res, next) {
   const num_of_providers = getProviderServer().providerList.length;
-  res.send(`There are ${num_of_providers} provider(s) created`);
+  res.send(`There are ${num_of_providers} provider(s) created` + JSON.stringify(getProviderServer().providerList));
 });
 
 /* GET create provider. */

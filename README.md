@@ -22,9 +22,17 @@ There are two endpoints and respective operations
   - check/:provider_id 
       - to check the running status of a provider
       - http://localhost:3000/provider/check/{provider_id}
+  - enable/:provider_id 
+      - to enable/reenable a provider
+      - http://localhost:3000/provider/enable/{provider_id}
+  - disable/:provider_id 
+      - to take down a provider from the cluster
+      - http://localhost:3000/provider/disable/{provider_id}
   - get
       - to get an overview of all providers available
       - http://localhost:3000/provider/get
+
+
 - Load Balancer http://localhost:3000/load_balancer/
   - register/:provider_id
       - to register a provider into the load balancer
@@ -34,7 +42,9 @@ There are two endpoints and respective operations
       - to get a provider from the load balancer
       - two methods are supported, random selection and round robin
       - excluded providers will not be returned
+      - providers failing heartbeat check will not be returned
       - providers reaching its maximum capacity will not be returned 
+      - if total cluster capacity is reached, no provider will be returned
       - random selection assignment: http://localhost:3000/load_balancer/get/random
       - round robin assignment: http://localhost:3000/load_balancer/get/round_robin
   - include/:provider_id
@@ -43,9 +53,13 @@ There are two endpoints and respective operations
   - exclude/:provider_id
       - to mannual exclude a provide from the load balancer
       - http://localhost:3000/load_balancer/exclude/{provider_id}
+
+- Heartbeat Check
+  - A provider will be excluded from the load balancer if it is disabled
+  - A provider will be included into the load balancer if the previously disabled provider get two(2) consecutive successful heartbeat check 
    
   # Config
    Two config variables defined at [loadbalancer.js](https://github.com/marshal-ma/load-balancer/blob/main/routes/load_balancer.js).
    - HEARTBEAT_CHECK_INTERVAL: defines the frequency of provider's heartbeat check
-   - CLUSTER_CAPACITY_LIMIT: defines the number of concurrent request a provider can handle
+   - PROVIDER_CAPACITY_LIMIT: defines the number of concurrent request a provider can handle
    

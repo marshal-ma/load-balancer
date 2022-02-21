@@ -1,11 +1,15 @@
 var express = require('express');
 var router = express.Router();
+var request = require('request');
+var axios = require('axios');
 
-const HEARTBEAT_CHECK_INTERVAL = 50000000;
+
+const HEARTBEAT_CHECK_INTERVAL = 5000;
+const PROVIDER_CAPACITY_LIMIT = 5;
+counter = 0;
 
 class LoadBalancer{
 	constructor(){
-
 		this.registery = [new ProviderEntry('a'), new ProviderEntry('b'), new ProviderEntry('c')];
 		this.capacity = 10;
 		this.roundRoubinReference = 0;
@@ -30,15 +34,14 @@ class LoadBalancer{
 		
 	incrementRoundRobinReference(){
 		this.roundRoubinReference = (this.roundRoubinReference + 1) % this.registery.length;
-		
-		while(!this.registery[this.roundRoubinReference].isIncluded){
+		while(!this.registery[this.roundRoubinReference].isIncluded || !this.registery[this.roundRoubinReference].hasCapacity()){
 			this.roundRoubinReference = (this.roundRoubinReference + 1) % this.registery.length;
 		}
 	}
 
 	getRandomReference(){
 		let reference = Math.floor(Math.random() * this.registery.length);
-		while(!this.registery[reference].isIncluded){
+		while(!this.registery[reference].isIncluded || !this.registery[reference].hasCapacity()){
 			Math.floor(Math.random() * this.registery.length);
 		}
 		return reference;
@@ -48,7 +51,7 @@ class LoadBalancer{
 		if(position > this.registery.length || !this.registery[position]){
 			throw 'no provider available at position ' + position;
 		}
-		return this.registery[position].id;
+		return this.registery[position];
 	}
 
 	getProviderWithId(provider_id){
@@ -63,13 +66,29 @@ class LoadBalancer{
 
 		return provider;
 	}
+
+	checkClusterCapacity(){
+		if(!this.registery.length){
+			throw 'registery is empty';
+		}
+
+		let totalRequest = 0;
+		for(let provider of this.registery){
+			totalRequest += provider.numOfConcurentRequest;
+		}
+
+		if(totalRequest >= this.registery.length * PROVIDER_CAPACITY_LIMIT){
+			throw 'Cluster maximum capacity is reached';
+		}
+	}
 }
 
 class ProviderEntry{
-	constructor(id, req){
+	constructor(id){
 		this.id = id;
 		this.isIncluded = true;
-		this.heartBeatCheck(req);
+		this.numOfConcurentRequest = 0;
+		this.heartBeatCheck();
 	}
 
 	include(){
@@ -80,10 +99,45 @@ class ProviderEntry{
 		this.isIncluded = false;
 	}
 
+	hasCapacity(){
+		return this.numOfConcurentRequest < PROVIDER_CAPACITY_LIMIT;
+	}
+
 	heartBeatCheck(){
-		const interval = setInterval(function(req) {
-   		// console.log("heartBeatCheck", this.id);
-		}, this.HEARTBEAT_CHECK_INTERVAL);
+		let firstCheck = false;	
+		const interval = setInterval(() => {
+	   		axios.get(`http://localhost:3000/provider/check/${this.id}`)
+					.then((response) => {
+						if(response.status === 200){
+							if(response.data.split(':')[1].trim() === 'true'){
+								if(firstCheck){
+									this.include();
+								}else{
+									firstCheck = true;
+								}
+							}else{
+								this.exclude();
+								firstCheck = false;
+							}
+						}
+					}).catch(function(err) {
+						 console.log(err);
+					});
+		 }, HEARTBEAT_CHECK_INTERVAL);
+		 
+		
+	}
+
+	incrementRequest(){
+		if(this.numOfConcurentRequest === PROVIDER_CAPACITY_LIMIT){
+			throw `Unable to send request to ${this.id}, maximum concurent request capacity reached.`
+		}
+
+		this.numOfConcurentRequest++;
+	}
+
+	decrementRequest(){
+		this.numOfConcurentRequest = Math.max(this.numOfConcurentRequest-1, 0);
 	}
 
 }
@@ -100,7 +154,7 @@ function getLoadBalancer(){
 
 /* GET users listing. */
 router.get('/', function(req, res, next) {
-  res.send('current provider list: ' + getLoadBalancer().registery.length);
+  res.send('current provider list: ' + JSON.stringify(getLoadBalancer().registery));
 });
 
 
@@ -109,16 +163,18 @@ router.get('/get/:method?', function(req, res, next) {
 	let reference = 0;
 
 	try{
+		getLoadBalancer().checkClusterCapacity();
+
 		if(req.params.method === 'round_robin'){
 		  	reference = getLoadBalancer().getRoundRobinReference();
 		}else{
 		  	reference = getLoadBalancer().getRandomReference();
 		}
 
-		const provider_id = getLoadBalancer().getProviderWithReference(reference);
-  		res.send('getting provider: ' + provider_id);
+		const provider = getLoadBalancer().getProviderWithReference(reference);
+		provider.incrementRequest();
+  		res.send('getting provider: ' + provider.id);
   	}catch(err){
-  		console.log(err);
   		res.status(500).send('failed to get a provider: ' + err);
   	}
   	
