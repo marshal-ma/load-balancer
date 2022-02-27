@@ -1,14 +1,14 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const { v4: uuidv4 } = require('uuid');
+const router = express.Router();
 
 class ProviderServer{
   constructor(){
     this.providerList = [new Provider('a'), new Provider('b'), new Provider('c')];
-    this.idGenerater = 0;
   }
 
   createProvider(){
-    const provider_id = this.idGenerater++;
+    const provider_id = uuidv4();
     this.providerList.push(new Provider(provider_id));
     return provider_id;
   }
