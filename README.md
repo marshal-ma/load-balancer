@@ -35,9 +35,13 @@ There are two endpoints and respective operations
 
 - Load Balancer http://localhost:3000/load_balancer/
   - register/:provider_id
-      - to register a provider into the load balancer
+      - to register a specific provider into the load balancer
       - load balancer's capacity is capped to 10
       - http://localhost:3000/load_balancer/register/{provider_id}
+  - register
+      - to batch register a list of providers into the load balancer
+      - load balancer's capacity is capped to 10
+      - http://localhost:3000/load_balancer/register/
   - get/{random|round_robin}
       - to get a provider from the load balancer
       - two methods are supported, random selection and round robin
@@ -48,10 +52,10 @@ There are two endpoints and respective operations
       - random selection assignment: http://localhost:3000/load_balancer/get/random
       - round robin assignment: http://localhost:3000/load_balancer/get/round_robin
   - include/:provider_id
-      - to mannual include a provide into the load balancer
+      - to mannually include a provider into the load balancer
       - http://localhost:3000/load_balancer/include/{provider_id}
   - exclude/:provider_id
-      - to mannual exclude a provide from the load balancer
+      - to mannually exclude a provider from the load balancer
       - http://localhost:3000/load_balancer/exclude/{provider_id}
 
 - Heartbeat Check
@@ -62,4 +66,5 @@ There are two endpoints and respective operations
    Two config variables defined at [loadbalancer.js](https://github.com/marshal-ma/load-balancer/blob/main/routes/load_balancer.js).
    - HEARTBEAT_CHECK_INTERVAL: defines the frequency of provider's heartbeat check
    - PROVIDER_CAPACITY_LIMIT: defines the number of concurrent request a provider can handle
+   - NUMBER_OF_NEW_PROVIDER_TO_REGISTER: defines the number of new providers to be batch registered
    

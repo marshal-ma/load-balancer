@@ -6,7 +6,9 @@ var axios = require('axios');
 
 const HEARTBEAT_CHECK_INTERVAL = 5000;
 const PROVIDER_CAPACITY_LIMIT = 5;
-counter = 0;
+const NUMBER_OF_NEW_PROVIDER_TO_REGISTER = 3;
+
+const _PROVIDER_END_POINT = 'http://localhost:3000/provider';
 
 class LoadBalancer{
 	constructor(){
@@ -34,14 +36,14 @@ class LoadBalancer{
 		
 	incrementRoundRobinReference(){
 		this.roundRoubinReference = (this.roundRoubinReference + 1) % this.registery.length;
-		while(!this.registery[this.roundRoubinReference].isIncluded || !this.registery[this.roundRoubinReference].hasCapacity()){
+		while(!this.checkEligibility(this.roundRoubinReference)){
 			this.roundRoubinReference = (this.roundRoubinReference + 1) % this.registery.length;
 		}
 	}
 
 	getRandomReference(){
 		let reference = Math.floor(Math.random() * this.registery.length);
-		while(!this.registery[reference].isIncluded || !this.registery[reference].hasCapacity()){
+		while(!this.checkEligibility(reference)){
 			Math.floor(Math.random() * this.registery.length);
 		}
 		return reference;
@@ -81,12 +83,17 @@ class LoadBalancer{
 			throw 'Cluster maximum capacity is reached';
 		}
 	}
+
+	checkEligibility(reference){
+		return this.registery[reference].isUp && this.registery[reference].isIncluded && this.registery[reference].hasCapacity();
+	}
 }
 
 class ProviderEntry{
 	constructor(id){
 		this.id = id;
 		this.isIncluded = true;
+		this.isUp = true;
 		this.numOfConcurentRequest = 0;
 		this.heartBeatCheck();
 	}
@@ -106,17 +113,17 @@ class ProviderEntry{
 	heartBeatCheck(){
 		let firstCheck = false;	
 		const interval = setInterval(() => {
-	   		axios.get(`http://localhost:3000/provider/check/${this.id}`)
+	   		axios.get(`${_PROVIDER_END_POINT}/check/${this.id}`)
 					.then((response) => {
 						if(response.status === 200){
 							if(response.data.split(':')[1].trim() === 'true'){
 								if(firstCheck){
-									this.include();
+									this.isUp = true;
 								}else{
 									firstCheck = true;
 								}
 							}else{
-								this.exclude();
+								this.isUp = false;
 								firstCheck = false;
 							}
 						}
@@ -181,9 +188,28 @@ router.get('/get/:method?', function(req, res, next) {
 });
 
 
-/* GET register a provider. */
+/* GET register a list of providers. */
 router.get('/register', function(req, res, next) {
-		res.status(400).send('To register a provider, call the endpoint with /register/:provider_id');
+		const new_provider_id_list = [];
+		const promiseList = [];
+		for(let count = 0; count < NUMBER_OF_NEW_PROVIDER_TO_REGISTER; count++){
+			promiseList.push(axios.get(`${_PROVIDER_END_POINT}/create`));
+		}
+			
+		Promise.all(promiseList)
+					.then((provider_res_list) => {
+						for(const provider_res of provider_res_list){
+							const new_provider_id = provider_res.data.split(':')[1].trim();
+							new_provider_id_list.push(new_provider_id);
+							getLoadBalancer().register(new_provider_id);
+						}
+					})
+					.then(() =>{
+						console.log(new_provider_id_list.length, new_provider_id_list);
+						res.status(200).send(`${new_provider_id_list.length} new provider(s) have been registered successfully: ` + new_provider_id_list);
+					}).catch((err) => {
+						res.status(500).send(`failed to register new provider(s): ` + err);
+					});
 });
 
 /* GET register a provider. */
