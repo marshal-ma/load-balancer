@@ -6,14 +6,17 @@ var axios = require('axios');
 
 const HEARTBEAT_CHECK_INTERVAL = 5000;
 const PROVIDER_CAPACITY_LIMIT = 5;
-const NUMBER_OF_NEW_PROVIDER_TO_REGISTER = 3;
 
+/* non-public config */
 const _PROVIDER_END_POINT = 'http://localhost:3000/provider';
+const _LOAD_BALANCER_CAPACITY_LIMIT = 10;
+const _PROVIDER_BATCH_REGISTER_SIZE = 3;
+
 
 class LoadBalancer{
 	constructor(){
 		this.registery = [new ProviderEntry('a'), new ProviderEntry('b'), new ProviderEntry('c')];
-		this.capacity = 10;
+		this.capacity = _LOAD_BALANCER_CAPACITY_LIMIT;
 		this.roundRoubinReference = 0;
 	}
 
@@ -23,6 +26,10 @@ class LoadBalancer{
 		}
 		const provider = new ProviderEntry(provider_id);
 		this.registery.push(provider);
+	}
+
+	getRemainingCapacity(){
+		return this.capacity - this.registery.length;
 	}
 
 	getRoundRobinReference(){
@@ -191,12 +198,13 @@ router.get('/get/:method?', function(req, res, next) {
 /* GET register a list of providers. */
 router.get('/register', function(req, res, next) {
 		const new_provider_id_list = [];
-		const promiseList = [];
-		for(let count = 0; count < NUMBER_OF_NEW_PROVIDER_TO_REGISTER; count++){
+		const promise_list = [];
+		const number_of_new_provider = Math.min(_PROVIDER_BATCH_REGISTER_SIZE, this.loadBalancer.getRemainingCapacity());
+		for(let count = 0; count < number_of_new_provider; count++){
 			promiseList.push(axios.get(`${_PROVIDER_END_POINT}/create`));
 		}
 			
-		Promise.all(promiseList)
+		Promise.all(promise_list)
 					.then((provider_res_list) => {
 						for(const provider_res of provider_res_list){
 							const new_provider_id = provider_res.data.split(':')[1].trim();
@@ -205,7 +213,6 @@ router.get('/register', function(req, res, next) {
 						}
 					})
 					.then(() =>{
-						console.log(new_provider_id_list.length, new_provider_id_list);
 						res.status(200).send(`${new_provider_id_list.length} new provider(s) have been registered successfully: ` + new_provider_id_list);
 					}).catch((err) => {
 						res.status(500).send(`failed to register new provider(s): ` + err);

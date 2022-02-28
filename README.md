@@ -65,6 +65,4 @@ There are two endpoints and respective operations
   # Config
    Two config variables defined at [loadbalancer.js](https://github.com/marshal-ma/load-balancer/blob/main/routes/load_balancer.js).
    - HEARTBEAT_CHECK_INTERVAL: defines the frequency of provider's heartbeat check
-   - PROVIDER_CAPACITY_LIMIT: defines the number of concurrent request a provider can handle
-   - NUMBER_OF_NEW_PROVIDER_TO_REGISTER: defines the number of new providers to be batch registered
-   
+   - PROVIDER_CAPACITY_LIMIT: defines the number of concurrent request a provider can handle   
