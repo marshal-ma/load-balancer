@@ -87,7 +87,7 @@ class LoadBalancer{
 		}
 
 		if(totalRequest >= this.registery.length * PROVIDER_CAPACITY_LIMIT){
-			throw 'Cluster maximum capacity is reached';
+			throw 'Cluster maximum capacity has been reached';
 		}
 	}
 
@@ -199,9 +199,9 @@ router.get('/get/:method?', function(req, res, next) {
 router.get('/register', function(req, res, next) {
 		const new_provider_id_list = [];
 		const promise_list = [];
-		const number_of_new_provider = Math.min(_PROVIDER_BATCH_REGISTER_SIZE, this.loadBalancer.getRemainingCapacity());
+		const number_of_new_provider = Math.min(_PROVIDER_BATCH_REGISTER_SIZE, getLoadBalancer().getRemainingCapacity());
 		for(let count = 0; count < number_of_new_provider; count++){
-			promiseList.push(axios.get(`${_PROVIDER_END_POINT}/create`));
+			promise_list.push(axios.get(`${_PROVIDER_END_POINT}/create`));
 		}
 			
 		Promise.all(promise_list)
